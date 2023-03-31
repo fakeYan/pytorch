@@ -1,4 +1,6 @@
-from torch._C import _rename_privateuse1_backend
+import torch
+from torch._C import _rename_privateuse1_backend, _get_privateuse1_backend_name
+from typing import Union, Optional, TypeVar
 
 def rename_privateuse1_backend(backend_name: str) -> None:
     r"""
@@ -50,3 +52,44 @@ def rename_privateuse1_backend(backend_name: str) -> None:
         >>> a = torch.ones(2, device="foo")
         """
     return _rename_privateuse1_backend(backend_name)
+
+
+def generate_for_privateuse1_backend() -> None:
+    r"""
+    generate_for_privateuse1_backend() -> None
+
+    Automatically generate attributes and methods for the custom backend after rename privateuse1 backend.
+    Example::
+
+        >>> torch.register_privateuse1_backend("foo")
+        >>> torch.generate_for_privateuse1_backend()
+        # Then automatically generate backend-related attributes and methods.
+        >>> a = torch.tensor(2).foo()
+        >>> a.is_foo
+        >>> hasattr(torch.nn.Module, 'foo')
+        """
+    custom_backend_name = _get_privateuse1_backend_name()
+
+    def check_register_once(module, attr):
+        if hasattr(module, attr):
+            raise RuntimeError(f"The custom device module of {module} has already been registered with {attr}")
+
+    @property
+    def wrap_tensor_backend(self: torch.Tensor) -> bool:
+        return self.device.type == custom_backend_name
+
+    check_register_once(torch.Tensor, f'is_{custom_backend_name}')
+    setattr(torch.Tensor, f'is_{custom_backend_name}', wrap_tensor_backend)
+
+    def wrap_tensor_to(self: torch.Tensor, index: Optional[Union[int, torch.device]] = 0):
+        return self.to(f'{custom_backend_name}:{index}')
+
+    check_register_once(torch.Tensor, f'{custom_backend_name}')
+    setattr(torch.Tensor, f'{custom_backend_name}', wrap_tensor_to)
+
+    T = TypeVar('T', bound='Module')
+    def wrap_module_to(self: T, device: Optional[Union[int, torch.device]] = None):
+        return self._apply(lambda t: getattr(t, f'{custom_backend_name}')(device))
+
+    check_register_once(torch.nn.Module, f'{custom_backend_name}')
+    setattr(torch.nn.Module, f'{custom_backend_name}', wrap_module_to)

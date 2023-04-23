@@ -319,7 +319,7 @@ inline std::unordered_map<std::string, bool> getTensorMetadata(
 }
 
 // set Tensor Metadata based on the map.
-// Refer: getTensorMathdata
+// Refer: getTensorMetadata
 inline void setTensorMetadata(
     const at::Tensor& t,
     std::unordered_map<std::string, bool> metadata) {
@@ -329,11 +329,9 @@ inline void setTensorMetadata(
     } else if (key_value_pair.first == "neg") {
       t._set_neg(true);
     } else {
-      TORCH_CHECK(
-          false,
-          "Unexpected key `",
-          key_value_pair.first,
-          "` passed to setTensorMetadata.");
+      TORCH_WARN_ONCE(
+          "There is an unexpected key passed to setTensorMetadata."
+          "The parsing of this part of the information will be skipped.");
     }
   }
 }
